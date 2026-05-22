@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Time Learning Game</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+  <style>
+        * { font-family: 'Fredoka', sans-serif; }
+        .clock-face { filter: drop-shadow(0 4px 12px rgba(0,0,0,0.15)); }
+        @keyframes bounce-in { 0% { transform: scale(0.3); opacity: 0; } 50% { transform: scale(1.05); } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+        @keyframes confetti { 0% { transform: translateY(0) rotate(0deg); opacity: 1; } 100% { transform: translateY(-100px) rotate(720deg); opacity: 0; } }
+        .bounce-in { animation: bounce-in 0.5s ease-out; }
+        .shake { animation: shake 0.4s ease-in-out; }
+        .confetti-piece { animation: confetti 1s ease-out forwards; position: absolute; }
+        .option-btn { transition: all 0.2s ease; }
+        .option-btn:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0,0,0,0.15); }
+        .correct-answer { background: #10b981 !important; color: white !important; transform: scale(1.05); }
+        .wrong-answer { background: #ef4444 !important; color: white !important; }
+        .progress-fill { transition: width 0.5s ease; }
+    </style>
+  <style>body { box-sizing: border-box; }</style>
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
+ </head>
+ <body class="h-full">
+  <div id="app" class="h-full w-full overflow-auto bg-gradient-to-br from-indigo-900 via-purple-900 to-fuchsia-900 flex flex-col items-center justify-center p-4">
+   <!-- Start Screen -->
+   <div id="start-screen" class="text-center bounce-in">
+    <div class="text-6xl mb-4">
+     ⏰
+    </div>
+    <h1 id="title-el" class="text-4xl md:text-5xl font-bold text-white mb-3">What Time Is It?</h1>
+    <p id="instruction-el" class="text-purple-200 text-lg mb-8 max-w-md mx-auto">Learn to tell time in English! Look at the clock and choose the correct answer.</p>
+    <div class="flex flex-col gap-3 items-center">
+     <button onclick="startGame('easy')" class="option-btn bg-emerald-500 hover:bg-emerald-400 text-white font-semibold px-8 py-3 rounded-xl text-lg w-56">🟢 Easy</button> 
+     <button onclick="startGame('medium')" class="option-btn bg-amber-500 hover:bg-amber-400 text-white font-semibold px-8 py-3 rounded-xl text-lg w-56">🟡 Medium</button> 
+     <button onclick="startGame('hard')" class="option-btn bg-red-500 hover:bg-red-400 text-white font-semibold px-8 py-3 rounded-xl text-lg w-56">🔴 Hard</button>
+    </div>
+   </div>
+   
+   <!-- Game Screen -->
+   <div id="game-screen" class="hidden w-full max-w-lg text-center">
+    <div class="flex justify-between items-center mb-4">
+     <span class="text-purple-200 font-medium">Question <span id="q-num">1</span>/10</span> 
+     <span class="text-yellow-300 font-semibold"><i data-lucide="star" class="inline w-5 h-5"></i> <span id="score-el">0</span></span>
+    </div>
+    <div class="w-full bg-purple-800/50 rounded-full h-3 mb-6">
+     <div id="progress-bar" class="progress-fill bg-gradient-to-r from-yellow-400 to-orange-400 h-3 rounded-full" style="width:10%"></div>
+    </div>
+    
+    <!-- Clock -->
+    <div class="flex justify-center mb-6">
+     <svg id="clock-svg" class="clock-face" width="200" height="200" viewBox="0 0 200 200">
+      <circle cx="100" cy="100" r="95" fill="#ffffff" stroke="#e2e8f0" stroke-width="4" /> 
+      <circle cx="100" cy="100" r="88" fill="none" stroke="#f1f5f9" stroke-width="1" /> 
+      <!-- Hour markers --> <g id="hour-markers"></g> 
+      <!-- Numbers --> <g id="clock-numbers" font-size="16" font-weight="600" fill="#334155" text-anchor="middle" dominant-baseline="central"></g> 
+      <!-- Hands --> <line id="hour-hand" x1="100" y1="100" x2="100" y2="55" stroke="#1e293b" stroke-width="5" stroke-linecap="round" /> 
+      <line id="minute-hand" x1="100" y1="100" x2="100" y2="35" stroke="#6366f1" stroke-width="3" stroke-linecap="round" /> 
+      <circle cx="100" cy="100" r="6" fill="#1e293b" /> 
+      <circle cx="100" cy="100" r="3" fill="#6366f1" />
+     </svg>
+    </div>
+    <p class="text-white text-xl font-medium mb-4">What time does the clock show?</p>
+    <div id="options-container" class="grid grid-cols-2 gap-3 mb-4"></div>
+    <div id="feedback" class="text-lg font-semibold h-8"></div>
+    <button id="next-btn" class="hidden mt-3 bg-white/20 hover:bg-white/30 text-white font-semibold px-6 py-2 rounded-xl transition" onclick="nextQuestion()">Next →</button>
+   </div>
+   
+   <!-- Result Screen -->
+   <div id="result-screen" class="hidden text-center bounce-in">
+    <div class="text-6xl mb-4" id="result-emoji">
+     🎉
+    </div>
+    <h2 class="text-3xl font-bold text-white mb-2">Game Over!</h2>
+    <p class="text-purple-200 text-lg mb-2">Your Score:</p>
+    <p class="text-5xl font-bold text-yellow-300 mb-2" id="final-score">0</p>
+    <p class="text-purple-200 mb-6" id="result-msg">Great job!</p>
+    <button onclick="showStart()" class="option-btn bg-white/20 hover:bg-white/30 text-white font-semibold px-8 py-3 rounded-xl text-lg">Play Again</button>
+   </div>
+  </div>
+  
+  <script>
+const defaultConfig = {
+    game_title: "What Time Is It?",
+    instruction_text: "Learn to tell time in English! Look at the clock and choose the correct answer.",
+};
+
+let config = { ...defaultConfig };
+
+function applyConfig(c) {
+    const titleEl = document.getElementById('title-el');
+    const instrEl = document.getElementById('instruction-el');
+    if (titleEl) titleEl.textContent = c.game_title || defaultConfig.game_title;
+    if (instrEl) instrEl.textContent = c.instruction_text || defaultConfig.instruction_text;
+}
+
+if (window.elementSdk) {
+    window.elementSdk.init({
+        defaultConfig,
+        onConfigChange: async (c) => { config = c; applyConfig(c); },
+        mapToCapabilities: (c) => ({
+            recolorables: [],
+            borderables: [],
+            fontEditable: undefined,
+            fontSizeable: undefined
+        }),
+        mapToEditPanelValues: (c) => new Map([
+            ["game_title", c.game_title || defaultConfig.game_title],
+            ["instruction_text", c.instruction_text || defaultConfig.instruction_text]
+        ])
+    });
+}
+
+// Game Logic
+let difficulty, questions, currentQ, score, answered;
+
+function buildClock() {
+    const markers = document.getElementById('hour-markers');
+    const numbers = document.getElementById('clock-numbers');
+    markers.innerHTML = '';
+    numbers.innerHTML = '';
+    for (let i = 1; i <= 12; i++) {
+        const angle = (i * 30 - 90) * Math.PI / 180;
+        const x1 = 100 + 82 * Math.cos(angle), y1 = 100 + 82 * Math.sin(angle);
+        const x2 = 100 + 88 * Math.cos(angle), y2 = 100 + 88 * Math.sin(angle);
+        markers.innerHTML += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#94a3b8" stroke-width="2"/>`;
+        const nx = 100 + 72 * Math.cos(angle), ny = 100 + 72 * Math.sin(angle);
+        numbers.innerHTML += `<text x="${nx}" y="${ny}">${i}</text>`;
+    }
+}
+
+function setClockHands(h, m) {
+    const hourAngle = ((h % 12) + m / 60) * 30 - 90;
+    const minAngle = m * 6 - 90;
+    const hHand = document.getElementById('hour-hand');
+    const mHand = document.getElementById('minute-hand');
+    const hr = hourAngle * Math.PI / 180, mr = minAngle * Math.PI / 180;
+    hHand.setAttribute('x2', 100 + 40 * Math.cos(hr));
+    hHand.setAttribute('y2', 100 + 40 * Math.sin(hr));
+    mHand.setAttribute('x2', 100 + 55 * Math.cos(mr));
+    mHand.setAttribute('y2', 100 + 55 * Math.sin(mr));
+}
+
+function timeToEnglish(h, m) {
+    const nums = ['twelve','one','two','three','four','five','six','seven','eight','nine','ten','eleven'];
+    const h12 = h % 12;
+    if (m === 0) return `${nums[h12]} o'clock`;
+    if (m === 15) return `a quarter past ${nums[h12]}`;
+    if (m === 30) return `half past ${nums[h12]}`;
+    if (m === 45) { const next = (h12 + 1) % 12; return `a quarter to ${nums[next]}`; }
+    if (m < 30) return `${formatMin(m)} past ${nums[h12]}`;
+    const next = (h12 + 1) % 12;
+    return `${formatMin(60 - m)} to ${nums[next]}`;
+}
+
+function formatMin(m) {
+    const w = ['','one','two','three','four','five','six','seven','eight','nine','ten',
+               'eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen',
+               'eighteen','nineteen','twenty','twenty-one','twenty-two','twenty-three',
+               'twenty-four','twenty-five','twenty-six','twenty-seven','twenty-eight','twenty-nine'];
+    return w[m] || m;
+}
+
+function generateTime() {
+    const h = Math.floor(Math.random() * 12) + 1;
+    let m;
+    if (difficulty === 'easy') m = [0, 30][Math.floor(Math.random() * 2)];
+    else if (difficulty === 'medium') m = [0, 15, 30, 45][Math.floor(Math.random() * 4)];
+    else m = Math.floor(Math.random() * 12) * 5;
+    return { h, m };
+}
+
+function generateOptions(correct, h, m) {
+    const opts = new Set([correct]);
+    while (opts.size < 4) {
+        const t = generateTime();
+        const txt = timeToEnglish(t.h, t.m);
+        if (txt !== correct) opts.add(txt);
+    }
+    return [...opts].sort(() => Math.random() - 0.5);
+}
+
+function startGame(diff) {
+    difficulty = diff;
+    score = 0; currentQ = 0; answered = false;
+    questions = Array.from({ length: 10 }, () => generateTime());
+    document.getElementById('start-screen').classList.add('hidden');
+    document.getElementById('result-screen').classList.add('hidden');
+    document.getElementById('game-screen').classList.remove('hidden');
+    showQuestion();
+}
+
+function showQuestion() {
+    answered = false;
+    const { h, m } = questions[currentQ];
+    setClockHands(h, m);
+    const correct = timeToEnglish(h, m);
+    const opts = generateOptions(correct, h, m);
+    const container = document.getElementById('options-container');
+    container.innerHTML = '';
+    opts.forEach(opt => {
+        const btn = document.createElement('button');
+        btn.className = 'option-btn bg-white/90 hover:bg-white text-purple-900 font-semibold py-3 px-4 rounded-xl text-sm md:text-base break-words';
+        btn.textContent = opt;
+        btn.onclick = () => checkAnswer(btn, opt, correct);
+        container.appendChild(btn);
+    });
+    document.getElementById('q-num').textContent = currentQ + 1;
+    document.getElementById('score-el').textContent = score;
+    document.getElementById('progress-bar').style.width = ((currentQ + 1) * 10) + '%';
+    document.getElementById('feedback').textContent = '';
+    document.getElementById('next-btn').classList.add('hidden');
+    lucide.createIcons();
+}
+
+function checkAnswer(btn, selected, correct) {
+    if (answered) return;
+    answered = true;
+    const btns = document.querySelectorAll('#options-container button');
+    btns.forEach(b => {
+        if (b.textContent === correct) b.classList.add('correct-answer');
+        else if (b === btn && selected !== correct) b.classList.add('wrong-answer');
+    });
+    const fb = document.getElementById('feedback');
+    if (selected === correct) {
+        score++;
+        document.getElementById('score-el').textContent = score;
+        fb.textContent = '✅ Correct! Great job!';
+        fb.className = 'text-lg font-semibold h-8 text-emerald-300';
+    } else {
+        fb.textContent = `❌ The answer is: ${correct}`;
+        fb.className = 'text-lg font-semibold h-8 text-red-300';
+        btn.classList.add('shake');
+    }
+    document.getElementById('next-btn').classList.remove('hidden');
+}
+
+function nextQuestion() {
+    currentQ++;
+    if (currentQ >= 10) showResult();
+    else showQuestion();
+}
+
+function showResult() {
+    document.getElementById('game-screen').classList.add('hidden');
+    const rs = document.getElementById('result-screen');
+    rs.classList.remove('hidden');
+    rs.className = 'text-center bounce-in';
+    document.getElementById('final-score').textContent = `${score}/10`;
+    const emoji = document.getElementById('result-emoji');
+    const msg = document.getElementById('result-msg');
+    if (score >= 9) { emoji.textContent = '🏆'; msg.textContent = 'Excellent! You\'re a time master!'; }
+    else if (score >= 7) { emoji.textContent = '🎉'; msg.textContent = 'Great job! Keep practicing!'; }
+    else if (score >= 5) { emoji.textContent = '👍'; msg.textContent = 'Good effort! Try again to improve!'; }
+    else { emoji.textContent = '💪'; msg.textContent = 'Keep trying! Practice makes perfect!'; }
+}
+
+function showStart() {
+    document.getElementById('result-screen').classList.add('hidden');
+    document.getElementById('game-screen').classList.add('hidden');
+    const ss = document.getElementById('start-screen');
+    ss.classList.remove('hidden');
+    ss.className = 'text-center bounce-in';
+}
+
+buildClock();
+lucide.createIcons();
+</script>
+ </body>
+</html>
