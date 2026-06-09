@@ -7,7 +7,7 @@
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
   <script src="/_sdk/element_sdk.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/@fontsource/fredoka@5.0.13/index.min.css" rel="stylesheet">
   <style>
         * { font-family: 'Fredoka', sans-serif; }
         .clock-face { filter: drop-shadow(0 4px 12px rgba(0,0,0,0.15)); }
@@ -25,14 +25,13 @@
     </style>
   <style>body { box-sizing: border-box; }</style>
   <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
+  <script src="/_sdk/telemetry_sdk.js"></script>
  </head>
  <body class="h-full">
   <div id="app" class="h-full w-full overflow-auto bg-gradient-to-br from-indigo-900 via-purple-900 to-fuchsia-900 flex flex-col items-center justify-center p-4">
    <!-- Start Screen -->
    <div id="start-screen" class="text-center bounce-in">
-    <div class="text-6xl mb-4">
-     ⏰
-    </div>
+    <div class="text-6xl mb-4">⏰</div>
     <h1 id="title-el" class="text-4xl md:text-5xl font-bold text-white mb-3">What Time Is It?</h1>
     <p id="instruction-el" class="text-purple-200 text-lg mb-8 max-w-md mx-auto">Learn to tell time in English! Look at the clock and choose the correct answer.</p>
     <div class="flex flex-col gap-3 items-center">
@@ -57,25 +56,31 @@
      <svg id="clock-svg" class="clock-face" width="200" height="200" viewBox="0 0 200 200">
       <circle cx="100" cy="100" r="95" fill="#ffffff" stroke="#e2e8f0" stroke-width="4" /> 
       <circle cx="100" cy="100" r="88" fill="none" stroke="#f1f5f9" stroke-width="1" /> 
-      <!-- Hour markers --> <g id="hour-markers"></g> 
-      <!-- Numbers --> <g id="clock-numbers" font-size="16" font-weight="600" fill="#334155" text-anchor="middle" dominant-baseline="central"></g> 
-      <!-- Hands --> <line id="hour-hand" x1="100" y1="100" x2="100" y2="55" stroke="#1e293b" stroke-width="5" stroke-linecap="round" /> 
+      <!-- Hour markers --> 
+      <g id="hour-markers"></g> 
+      <!-- Numbers --> 
+      <g id="clock-numbers" font-size="16" font-weight="600" fill="#334155" text-anchor="middle" dominant-baseline="central"></g> 
+      <!-- Hands --> 
+      <line id="hour-hand" x1="100" y1="100" x2="100" y2="55" stroke="#1e293b" stroke-width="5" stroke-linecap="round" /> 
       <line id="minute-hand" x1="100" y1="100" x2="100" y2="35" stroke="#6366f1" stroke-width="3" stroke-linecap="round" /> 
       <circle cx="100" cy="100" r="6" fill="#1e293b" /> 
       <circle cx="100" cy="100" r="3" fill="#6366f1" />
      </svg>
     </div>
+    
     <p class="text-white text-xl font-medium mb-4">What time does the clock show?</p>
     <div id="options-container" class="grid grid-cols-2 gap-3 mb-4"></div>
     <div id="feedback" class="text-lg font-semibold h-8"></div>
+    
+    <button id="speak-btn" class="mt-3 bg-blue-500 hover:bg-blue-400 text-white font-semibold px-6 py-2 rounded-xl transition flex items-center gap-2 justify-center mx-auto" onclick="speakTime()"> 
+     <i data-lucide="volume-2" class="w-5 h-5"></i> Listen 
+    </button> 
     <button id="next-btn" class="hidden mt-3 bg-white/20 hover:bg-white/30 text-white font-semibold px-6 py-2 rounded-xl transition" onclick="nextQuestion()">Next →</button>
    </div>
    
    <!-- Result Screen -->
    <div id="result-screen" class="hidden text-center bounce-in">
-    <div class="text-6xl mb-4" id="result-emoji">
-     🎉
-    </div>
+    <div class="text-6xl mb-4" id="result-emoji">🎉</div>
     <h2 class="text-3xl font-bold text-white mb-2">Game Over!</h2>
     <p class="text-purple-200 text-lg mb-2">Your Score:</p>
     <p class="text-5xl font-bold text-yellow-300 mb-2" id="final-score">0</p>
@@ -118,6 +123,8 @@ if (window.elementSdk) {
 
 // Game Logic
 let difficulty, questions, currentQ, score, answered;
+
+const synth = window.speechSynthesis;
 
 function buildClock() {
     const markers = document.getElementById('hour-markers');
@@ -205,7 +212,7 @@ function showQuestion() {
     container.innerHTML = '';
     opts.forEach(opt => {
         const btn = document.createElement('button');
-        btn.className = 'option-btn bg-white/90 hover:bg-white text-purple-900 font-semibold py-3 px-4 rounded-xl text-sm md:text-base break-words';
+        btn.className = 'option-btn bg-white/90 hover:bg-white text-purple-900 font-semibold py-3 px-4 rounded-xl text-base';
         btn.textContent = opt;
         btn.onclick = () => checkAnswer(btn, opt, correct);
         container.appendChild(btn);
@@ -215,12 +222,15 @@ function showQuestion() {
     document.getElementById('progress-bar').style.width = ((currentQ + 1) * 10) + '%';
     document.getElementById('feedback').textContent = '';
     document.getElementById('next-btn').classList.add('hidden');
+    document.getElementById('speak-btn').classList.remove('hidden');
     lucide.createIcons();
+    setTimeout(() => speakTime(), 500);
 }
 
 function checkAnswer(btn, selected, correct) {
     if (answered) return;
     answered = true;
+    synth.cancel();
     const btns = document.querySelectorAll('#options-container button');
     btns.forEach(b => {
         if (b.textContent === correct) b.classList.add('correct-answer');
@@ -237,6 +247,7 @@ function checkAnswer(btn, selected, correct) {
         fb.className = 'text-lg font-semibold h-8 text-red-300';
         btn.classList.add('shake');
     }
+    document.getElementById('speak-btn').classList.add('hidden');
     document.getElementById('next-btn').classList.remove('hidden');
 }
 
@@ -270,6 +281,18 @@ function showStart() {
 
 buildClock();
 lucide.createIcons();
-</script>
+
+function speakTime() {
+    synth.cancel();
+    const { h, m } = questions[currentQ];
+    const text = timeToEnglish(h, m);
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'en-US';
+    utterance.rate = 0.9;
+    utterance.pitch = 1;
+    synth.speak(utterance);
+}
+  </script>
  </body>
 </html>
+
